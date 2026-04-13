@@ -249,7 +249,9 @@ class Net(nn.Module):
             high_input_norm = utils.data_transform(low_R * high_L)
 
             x = high_input_norm * a.sqrt() + e * (1.0 - a).sqrt()
-            noise_output = self.Unet(torch.cat([low_condition_norm, x], dim=1), t.float())
+            # AMP autocast only on the heavy UNet call; DDIM sampling stays float32
+            with autocast(enabled=self.args.mode == 'training'):
+                noise_output = self.Unet(torch.cat([low_condition_norm, x], dim=1), t.float())
 
             pred_fea = self.sample_training(low_condition_norm, b)
             pred_fea = utils.inverse_data_transform(pred_fea)
@@ -426,9 +428,12 @@ class DenoisingDiffusion(object):
 
                 x = x.to(self.device)
 
-                # --- Forward pass with optional AMP ---
+                # --- Forward pass ---
+                # NOTE: AMP autocast is applied INSIDE Net.forward() only around
+                # the main UNet call, NOT around DDIM sampling which needs float32
+                # for numerical stability (cumulative alpha products overflow in fp16).
+                output = self.model(x)
                 with autocast(enabled=self.use_amp):
-                    output = self.model(x)
                     noise_loss, scc_loss = self.noise_estimation_loss(output)
                     loss = noise_loss + scc_loss
 
