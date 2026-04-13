@@ -187,7 +187,7 @@ class Net(nn.Module):
 
     @staticmethod
     def load_stage1(model, model_dir):
-        checkpoint = utils.logging.load_checkpoint(os.path.join(model_dir, 'stage1_weight.pth.tar'), 'cuda')
+        checkpoint = utils.load_checkpoint(os.path.join(model_dir, 'stage1_weight.pth.tar'), 'cuda')
         model.load_state_dict(checkpoint['model'], strict=True)
         return model
 
@@ -352,7 +352,7 @@ class DenoisingDiffusion(object):
             logger.info("Perceptual loss (VGG-16) initialized")
 
     def load_ddm_ckpt(self, load_path, ema=False):
-        checkpoint = utils.logging.load_checkpoint(load_path, None)
+        checkpoint = utils.load_checkpoint(load_path, None)
         self.model.load_state_dict(checkpoint['state_dict'], strict=True)
 
         # Restore optimizer and scheduler if available
@@ -505,7 +505,7 @@ class DenoisingDiffusion(object):
                     if scheduler is not None:
                         ckpt_state['scheduler'] = scheduler.state_dict()
 
-                    utils.logging.save_checkpoint(
+                    utils.save_checkpoint(
                         ckpt_state,
                         filename=os.path.join(self.config.data.ckpt_dir, 'model_latest'),
                         is_best=is_best
@@ -594,7 +594,7 @@ class DenoisingDiffusion(object):
                 img_w_64 = int(64 * np.ceil(img_w / 64.0))
                 x = F.pad(x, (0, img_w_64 - img_w, 0, img_h_64 - img_h), 'reflect')
                 pred_x = self.model(x.to(self.device))["pred_x"][:, :, :img_h, :img_w]
-                utils.logging.save_image(pred_x, os.path.join(image_folder, str(step), '{}'.format(y[0])))
+                utils.save_image(pred_x, os.path.join(image_folder, str(step), '{}'.format(y[0])))
 
                 # Log first few validation images to TensorBoard
                 if self.writer and i < 4:
