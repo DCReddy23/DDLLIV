@@ -439,8 +439,9 @@ class DenoisingDiffusion(object):
                 # --- Gradient clipping ---
                 if self.grad_clip > 0:
                     self.scaler.unscale_(self.optimizer)
+                    trainable_params = [p for p in self.model.parameters() if p.requires_grad]
                     grad_norm = torch.nn.utils.clip_grad_norm_(
-                        self.model.parameters(), self.grad_clip
+                        trainable_params, self.grad_clip
                     )
                 else:
                     grad_norm = 0.0
