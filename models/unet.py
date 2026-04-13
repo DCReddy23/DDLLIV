@@ -322,8 +322,14 @@ class DiffusionUNet(nn.Module):
         # upsampling
         for i_level in reversed(range(self.num_resolutions)):
             for i_block in range(self.num_res_blocks+1):
+                skip = hs.pop()
+                # Pad h if spatial dims don't match skip connection (odd-size inputs)
+                if h.shape[2] != skip.shape[2] or h.shape[3] != skip.shape[3]:
+                    diff_h = skip.shape[2] - h.shape[2]
+                    diff_w = skip.shape[3] - h.shape[3]
+                    h = torch.nn.functional.pad(h, (0, diff_w, 0, diff_h))
                 h = self.up[i_level].block[i_block](
-                    torch.cat([h, hs.pop()], dim=1), temb)
+                    torch.cat([h, skip], dim=1), temb)
                 if len(self.up[i_level].attn) > 0:
                     h = self.up[i_level].attn[i_block](h)
             if i_level != 0:
