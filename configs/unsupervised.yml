@@ -28,11 +28,11 @@ diffusion:
     num_sampling_timesteps: 20
 
 training:
-    batch_size: 12
+    batch_size: 4
     n_epochs: 100
     validation_freq: 2000
     grad_clip: 1.0
-    use_amp: True
+    use_amp: False
     log_freq: 10
     save_freq: 2000
     warmup_steps: 500

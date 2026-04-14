@@ -209,7 +209,7 @@ class Net(nn.Module):
         seq = range(0, self.config.diffusion.num_diffusion_timesteps, skip)
         n, c, h, w = x_cond.shape
         seq_next = [-1] + list(seq[:-1])
-        x = torch.randn(n, c, h, w, device=self.device)
+        x = torch.randn(n, c, h, w, device=x_cond.device)
         xs = [x]
         for i, j in zip(reversed(seq), reversed(seq_next)):
             t = (torch.ones(n) * i).to(x.device)
@@ -234,14 +234,16 @@ class Net(nn.Module):
         b = self.betas.to(inputs.device)
 
         if self.training:
-            output = self.decom(inputs, pred_fea=None)
+            # Decom is frozen — no need to store activations for backprop
+            with torch.no_grad():
+                output = self.decom(inputs, pred_fea=None)
             low_R, low_L, low_fea, high_L = output["low_R"], output["low_L"], \
                 output["low_fea"], output["high_L"]
             low_condition_norm = utils.data_transform(low_fea)
 
-            t = torch.randint(low=0, high=self.num_timesteps, size=(low_condition_norm.shape[0] // 2 + 1,)).to(
-                self.device)
-            t = torch.cat([t, self.num_timesteps - t - 1], dim=0)[:low_condition_norm.shape[0]].to(inputs.device)
+            t = torch.randint(low=0, high=self.num_timesteps, size=(low_condition_norm.shape[0] // 2 + 1,),
+                              device=inputs.device)
+            t = torch.cat([t, self.num_timesteps - t - 1], dim=0)[:low_condition_norm.shape[0]]
             a = (1 - b).cumprod(dim=0).index_select(0, t).view(-1, 1, 1, 1)
 
             e = torch.randn_like(low_condition_norm)
@@ -251,15 +253,18 @@ class Net(nn.Module):
             x = high_input_norm * a.sqrt() + e * (1.0 - a).sqrt()
             noise_output = self.Unet(torch.cat([low_condition_norm, x], dim=1), t.float())
 
-            pred_fea = self.sample_training(low_condition_norm, b)
-            pred_fea = utils.inverse_data_transform(pred_fea)
+            # DDIM sampling under no_grad — runs UNet N times, would OOM if
+            # we tried to store the full computation graph for backprop
+            with torch.no_grad():
+                pred_fea = self.sample_training(low_condition_norm, b)
+            pred_fea = utils.inverse_data_transform(pred_fea.detach())
             reference_fea = low_R * torch.pow(low_L, 0.2)
 
             data_dict["noise_output"] = noise_output
             data_dict["e"] = e
 
             data_dict["pred_fea"] = pred_fea
-            data_dict["reference_fea"] = reference_fea
+            data_dict["reference_fea"] = reference_fea.detach()
 
         else:
             output = self.decom(inputs, pred_fea=None)

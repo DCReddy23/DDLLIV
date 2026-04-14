@@ -117,7 +117,7 @@ class PerceptualLoss(nn.Module):
             weights = [1.0, 1.0, 1.0, 1.0]
 
         self.weights = weights
-        vgg = models.vgg16(pretrained=True).features
+        vgg = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1).features
 
         self.blocks = nn.ModuleList()
         prev = 0
