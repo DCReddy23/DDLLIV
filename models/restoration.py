@@ -45,6 +45,7 @@ class DiffusiveRestoration:
         if os.path.isfile(args.resume):
             self.diffusion.load_ddm_ckpt(args.resume, ema=False)
             self.diffusion.model.eval()
+            self.diffusion.model.module.eval() 
         else:
             print('Pre-trained model path is missing!')
 
@@ -78,8 +79,7 @@ class DiffusiveRestoration:
                 x_cond = F.pad(x_cond, (0, img_w_64 - w, 0, img_h_64 - h), 'reflect')
 
                 t1 = time.time()
-                pred_x = self.diffusion.model(torch.cat((x_cond, x_cond),
-                                                        dim=1))["pred_x"][:, :, :h, :w]
+                pred_x = self.diffusion.model(x_cond)["pred_x"][:, :, :h, :w]
                 t2 = time.time()
                 elapsed = t2 - t1
                 total_time += elapsed
