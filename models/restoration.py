@@ -85,7 +85,7 @@ class DiffusiveRestoration:
                 total_time += elapsed
 
                 # Save restored image
-                utils.logging.save_image(pred_x, os.path.join(image_folder, f"{y[0]}"))
+                utils.save_image(pred_x, os.path.join(image_folder, f"{y[0]}"))
 
                 # Compute metrics if ground truth is available
                 if tracker is not None and x_gt is not None:
