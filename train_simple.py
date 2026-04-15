@@ -9,8 +9,11 @@ import yaml
 import datasets
 from models.simple_ddm import SimpleDDM, SimpleDDMTrainer
 
+DEFAULT_SIMPLE_CKPT_DIR = "ckpt/simple"
+
 
 def dict2namespace(config):
+    """Recursively convert dict config into argparse.Namespace for dot access."""
     namespace = argparse.Namespace()
     for key, value in config.items():
         if isinstance(value, dict):
@@ -23,6 +26,7 @@ def parse_args_and_config():
     parser = argparse.ArgumentParser(description="Simple DDLLIV training")
     parser.add_argument("--config", default="unsupervised.yml", type=str)
     parser.add_argument("--resume", default="", type=str)
+    # Keep the same default seed as existing train.py for consistent behavior.
     parser.add_argument("--seed", default=230, type=int)
     args = parser.parse_args()
 
@@ -65,7 +69,7 @@ def main():
         l2_weight=getattr(config.training, "l2_weight", 1.0),
     )
 
-    ckpt_dir = getattr(config.data, "ckpt_dir", "ckpt/simple")
+    ckpt_dir = getattr(config.data, "ckpt_dir", DEFAULT_SIMPLE_CKPT_DIR)
     os.makedirs(ckpt_dir, exist_ok=True)
     latest_path = os.path.join(ckpt_dir, "simple_model_latest.pth.tar")
     best_path = os.path.join(ckpt_dir, "simple_model_best.pth.tar")
@@ -85,7 +89,7 @@ def main():
 
         lr = trainer.current_lr()
         print(
-            f"Epoch {epoch + 1}/{n_epochs} | "
+            f"Epoch {epoch}/{n_epochs} | "
             f"train_loss: {train_stats['total']:.5f} (l1: {train_stats['l1']:.5f}, l2: {train_stats['l2']:.5f}) | "
             f"val_loss: {val_stats['total']:.5f} | "
             f"PSNR: {val_stats['psnr']:.3f} dB | SSIM: {val_stats['ssim']:.4f} | "

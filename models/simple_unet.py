@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class ConvBlock(nn.Module):
@@ -21,31 +22,35 @@ class ConvBlock(nn.Module):
 class SimpleUNet(nn.Module):
     def __init__(self, in_channels=3, out_channels=3, base_channels=32):
         super().__init__()
-        c1, c2, c3, c4 = base_channels, base_channels * 2, base_channels * 4, base_channels * 8
+        enc1_channels = base_channels
+        enc2_channels = base_channels * 2
+        enc3_channels = base_channels * 4
+        enc4_channels = base_channels * 8
 
-        self.enc1 = ConvBlock(in_channels, c1)
-        self.enc2 = ConvBlock(c1, c2)
-        self.enc3 = ConvBlock(c2, c3)
-        self.enc4 = ConvBlock(c3, c4)
+        self.enc1 = ConvBlock(in_channels, enc1_channels)
+        self.enc2 = ConvBlock(enc1_channels, enc2_channels)
+        self.enc3 = ConvBlock(enc2_channels, enc3_channels)
+        self.enc4 = ConvBlock(enc3_channels, enc4_channels)
         self.pool = nn.MaxPool2d(2)
 
-        self.bottleneck = ConvBlock(c4, c4 * 2)
+        self.bottleneck = ConvBlock(enc4_channels, enc4_channels * 2)
 
-        self.up4 = nn.ConvTranspose2d(c4 * 2, c4, kernel_size=2, stride=2)
-        self.dec4 = ConvBlock(c4 * 2, c4)
-        self.up3 = nn.ConvTranspose2d(c4, c3, kernel_size=2, stride=2)
-        self.dec3 = ConvBlock(c3 * 2, c3)
-        self.up2 = nn.ConvTranspose2d(c3, c2, kernel_size=2, stride=2)
-        self.dec2 = ConvBlock(c2 * 2, c2)
-        self.up1 = nn.ConvTranspose2d(c2, c1, kernel_size=2, stride=2)
-        self.dec1 = ConvBlock(c1 * 2, c1)
+        self.up4 = nn.ConvTranspose2d(enc4_channels * 2, enc4_channels, kernel_size=2, stride=2)
+        self.dec4 = ConvBlock(enc4_channels * 2, enc4_channels)
+        self.up3 = nn.ConvTranspose2d(enc4_channels, enc3_channels, kernel_size=2, stride=2)
+        self.dec3 = ConvBlock(enc3_channels * 2, enc3_channels)
+        self.up2 = nn.ConvTranspose2d(enc3_channels, enc2_channels, kernel_size=2, stride=2)
+        self.dec2 = ConvBlock(enc2_channels * 2, enc2_channels)
+        self.up1 = nn.ConvTranspose2d(enc2_channels, enc1_channels, kernel_size=2, stride=2)
+        self.dec1 = ConvBlock(enc1_channels * 2, enc1_channels)
 
-        self.out_conv = nn.Conv2d(c1, out_channels, kernel_size=1)
+        self.out_conv = nn.Conv2d(enc1_channels, out_channels, kernel_size=1)
 
     @staticmethod
     def _align_and_concat(x, skip):
+        """Resize decoder feature to skip size, then concatenate along channels."""
         if x.shape[2:] != skip.shape[2:]:
-            x = torch.nn.functional.interpolate(x, size=skip.shape[2:], mode="bilinear", align_corners=False)
+            x = F.interpolate(x, size=skip.shape[2:], mode="bilinear", align_corners=False)
         return torch.cat([x, skip], dim=1)
 
     def forward(self, x):

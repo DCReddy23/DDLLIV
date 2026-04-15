@@ -46,11 +46,16 @@ class SimpleDDMTrainer:
         )
         self.loss_fn = SimpleL1L2Loss(l1_weight=l1_weight, l2_weight=l2_weight)
 
+    @staticmethod
+    def _safe_num_batches(loader):
+        """Return batch count with 1 as floor to avoid divide-by-zero in averages."""
+        return max(len(loader), 1)
+
     def train_one_epoch(self, loader):
         self.model.train()
         running = {"total": 0.0, "l1": 0.0, "l2": 0.0}
 
-        for batch, _ in loader:
+        for batch, _img_ids in loader:
             low = batch[:, :3].to(self.device)
             high = batch[:, 3:].to(self.device)
 
@@ -65,7 +70,7 @@ class SimpleDDMTrainer:
             running["l1"] += parts["l1"].item()
             running["l2"] += parts["l2"].item()
 
-        num_batches = max(len(loader), 1)
+        num_batches = self._safe_num_batches(loader)
         return {k: v / num_batches for k, v in running.items()}
 
     @torch.no_grad()
@@ -73,7 +78,7 @@ class SimpleDDMTrainer:
         self.model.eval()
         running = {"total": 0.0, "l1": 0.0, "l2": 0.0, "psnr": 0.0, "ssim": 0.0}
 
-        for batch, _ in loader:
+        for batch, _img_ids in loader:
             low = batch[:, :3].to(self.device)
             high = batch[:, 3:].to(self.device)
 
@@ -89,7 +94,7 @@ class SimpleDDMTrainer:
             running["psnr"] += compute_psnr(pred_clamped, high_clamped)
             running["ssim"] += compute_ssim(pred_clamped, high_clamped, channels=pred_clamped.shape[1])
 
-        num_batches = max(len(loader), 1)
+        num_batches = self._safe_num_batches(loader)
         return {k: v / num_batches for k, v in running.items()}
 
     @torch.no_grad()
@@ -104,7 +109,9 @@ class SimpleDDMTrainer:
         return self.optimizer.param_groups[0]["lr"]
 
     def save_checkpoint(self, path, epoch, best_psnr):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        ckpt_dir = os.path.dirname(path)
+        if ckpt_dir:
+            os.makedirs(ckpt_dir, exist_ok=True)
         torch.save(
             {
                 "epoch": epoch,

@@ -9,6 +9,7 @@ class SimpleL1L2Loss(nn.Module):
         self.l2_weight = l2_weight
 
     def forward(self, prediction, target):
+        """Return weighted total loss and individual L1/L2 components."""
         l1 = F.l1_loss(prediction, target)
         l2 = F.mse_loss(prediction, target)
         total = self.l1_weight * l1 + self.l2_weight * l2

@@ -11,6 +11,10 @@ import utils
 from models.simple_ddm import SimpleDDM, SimpleDDMTrainer
 from utils.metrics import MetricTracker
 
+DEFAULT_SIMPLE_CKPT_DIR = "ckpt/simple"
+# Keep 64-padding to match original inference path alignment behavior.
+PADDING_MULTIPLE = 64
+
 
 def dict2namespace(config):
     namespace = argparse.Namespace()
@@ -24,7 +28,7 @@ def dict2namespace(config):
 def parse_args_and_config():
     parser = argparse.ArgumentParser(description="Simple DDLLIV evaluation")
     parser.add_argument("--config", default="unsupervised.yml", type=str)
-    parser.add_argument("--resume", default="ckpt/stage2/simple_model_best.pth.tar", type=str)
+    parser.add_argument("--resume", default="", type=str)
     parser.add_argument("--image_folder", default="results_simple", type=str)
     args = parser.parse_args()
 
@@ -49,9 +53,13 @@ def main():
     )
     trainer = SimpleDDMTrainer(model=model, device=device)
 
-    if not os.path.isfile(args.resume):
-        raise FileNotFoundError(f"Checkpoint not found: {args.resume}")
-    trainer.load_checkpoint(args.resume)
+    resume_path = args.resume or os.path.join(
+        getattr(config.data, "ckpt_dir", DEFAULT_SIMPLE_CKPT_DIR),
+        "simple_model_best.pth.tar",
+    )
+    if not os.path.isfile(resume_path):
+        raise FileNotFoundError(f"Checkpoint not found: {resume_path}")
+    trainer.load_checkpoint(resume_path)
 
     output_dir = os.path.join(args.image_folder, config.data.val_dataset)
     os.makedirs(output_dir, exist_ok=True)
@@ -63,8 +71,8 @@ def main():
             high = batch[:, 3:].to(device)
 
             h, w = low.shape[-2:]
-            h_pad = int(64 * np.ceil(h / 64.0))
-            w_pad = int(64 * np.ceil(w / 64.0))
+            h_pad = int(PADDING_MULTIPLE * np.ceil(h / float(PADDING_MULTIPLE)))
+            w_pad = int(PADDING_MULTIPLE * np.ceil(w / float(PADDING_MULTIPLE)))
             low_padded = F.pad(low, (0, w_pad - w, 0, h_pad - h), "reflect")
 
             pred = trainer.predict(low_padded)[:, :, :h, :w]
